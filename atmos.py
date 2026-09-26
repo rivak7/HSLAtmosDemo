@@ -10,9 +10,32 @@ EARTH_RADIUS_KM = 6000.0 # if you modify this make sure to update line 38 of dem
 ATMOSPHERE_THICKNESS_KM = 110 # The true atmosphere extends quite far, so we choose a point where it visually seems to end
 # ^ this atmosphere is actually very innacurate, but sometimes it's instructive to have it be big to see what's going on
 # be careful though, sometimes having a thick atmosphere leads to unintended consequences
+MOLECULAR_SCALE_HEIGHT_KM = 8.0 # H
 #endregion
 
 #region HELPER FUNCTIONS
+
+# This function models the density of the atmosphere with altitude using p(h) = p_0 * e^(-h/H)
+@ti.func
+def atmospheric_density(pos: vec3) -> ti.f32:
+    altitude_km = pos.norm() - EARTH_RADIUS_KM # altitude above surface
+    return ti.exp(-altitude_km / MOLECULAR_SCALE_HEIGHT_KM) if (altitude_km >= 0.0 and altitude_km <= ATMOSPHERE_THICKNESS_KM) else 0
+
+NUM_VIEW_SAMPLES = 16 # use 16 samples for numerical integration
+@ti.func
+def integrate_density(start: vec3, end: vec3) -> ti.f32:
+    segment = end - start
+    segment_length = segment.norm()
+    step = segment / NUM_VIEW_SAMPLES
+    step_length = segment_length / NUM_VIEW_SAMPLES
+
+    total_density = 0.0
+
+    for i in ti.static(range(NUM_VIEW_SAMPLES)):
+        sample_pos = start + step * (ti.cast(i, ti.f32) + 0.5)
+        total_density += atmospheric_density(sample_pos) * step_length
+
+    return total_density
 
 # This function transforms the ray into a coordinate space where the z axis is scaled by width/height
 @ti.func
@@ -82,6 +105,25 @@ def funnyFunction(pos, ray, sun_dir):
     else:
         funGradient = (ray-vec3(0.5,0,0))*0.5+vec3(0.5,0.5,0.5)
     return funGradient
+
+@ti.func
+def funnyFunction(pos, ray, sun_dir):
+    first_pos, first_hit, second_pos, second_hit = \
+        cast_ray_against_oblate_spheroid(
+            pos,
+            ray,
+            EARTH_RADIUS_KM + ATMOSPHERE_THICKNESS_KM,
+            EARTH_RADIUS_KM + ATMOSPHERE_THICKNESS_KM,
+        )
+    color = vec3(0.0, 0.0, 0.0)
+
+    if first_hit and second_hit:
+        density = integrate_density(first_pos, second_pos)
+        # Debug visualization only: compress column density into a 0-1 range
+        debug_value = 1.0 - ti.exp(-0.01 * density)
+        color = vec3(debug_value, debug_value, debug_value)
+
+    return color
 
 # the main function that demo.py calls to get the color of the atmosphere at a certain pixel
 @ti.func
