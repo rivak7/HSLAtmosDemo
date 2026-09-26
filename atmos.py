@@ -6,7 +6,7 @@ dot = ti.Vector.dot
 
 #region CONSTANTS
 # feel free to change these (reasonable precision with citations might get you points!)
-EARTH_RADIUS_KM = 6000.0 # if you modify this make sure to update line 38 of demo.py 
+EARTH_RADIUS_KM = 6000.0 # if you modify this make sure to update line 38 of demo.py
 ATMOSPHERE_THICKNESS_KM = 110 # The true atmosphere extends quite far, so we choose a point where it visually seems to end
 # ^ this atmosphere is actually very innacurate, but sometimes it's instructive to have it be big to see what's going on
 # be careful though, sometimes having a thick atmosphere leads to unintended consequences
@@ -75,7 +75,10 @@ def funnyFunction(pos, ray, sun_dir):
     if (collided):
         hit_dir = atmosphereHitPosition.normalized()
         # notice you can sometimes get weird behavior when there's negative values
-        funGradient = (hit_dir*0.5+vec3(0.5,0.5,0.8)) * max(dot(hit_dir, sun_dir),0.05) + _earth(pos, ray, sun_dir)*vec3(0.5,0.5,0.7) + vec3(0.05,0.02,0.05)
+        color_term = (hit_dir*0.5+vec3(0.5,0.5,0.8)) * max(dot(hit_dir, sun_dir),0.05)
+        earth_term = _earth(pos, ray, sun_dir)*vec3(0.5,0.5,0.7) #earth coloring
+        haze = vec3(0.05,0.02,0.05) #haze due to uniform atmosphere
+        funGradient = color_term + earth_term + haze
     else:
         funGradient = (ray-vec3(0.5,0,0))*0.5+vec3(0.5,0.5,0.5)
     return funGradient
